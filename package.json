@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "description": "Run Hapi server on AWS Lambda",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "gulp build-unit-test",
     "update": "gulp build && np --no-publish --no-yarn"
