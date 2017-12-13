@@ -1,0 +1,7 @@
+/tsconfig.json
+/src
+/gulpfile.js
+
+node_modules/
+.idea/
+reports/
