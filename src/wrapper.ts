@@ -60,8 +60,8 @@ const injectRequest = function (server: Hapi.Server,
         requestOptions.payload = event.body;
     }
 
-    if (options.setCredentials) {
-        options.setCredentials(event, context, requestOptions);
+    if (options.modifyRequest) {
+        options.modifyRequest(event, context, requestOptions);
     }
 
     if (debug.enabled) {

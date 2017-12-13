@@ -280,14 +280,14 @@ describe('.handlerFromServer()', () => {
             });
         });
 
-        describe('setCredentials function', () => {
+        describe('modifyRequest function', () => {
             it('should call it before injecting the request', (done) => {
                 spec.mockRoute.handler = (request, reply) => {
                     reply({ credentials: request.auth.credentials });
                 };
                 spec.server.route(spec.mockRoute);
 
-                spec.injectOptions.setCredentials = (event, context, request) => {
+                spec.injectOptions.modifyRequest = (event, context, request) => {
                     expect(event).toBe(spec.event);
                     expect(context).toBe(spec.context);
                     expect(request).toEqual({
