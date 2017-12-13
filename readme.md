@@ -1,6 +1,9 @@
 # hapi-lambda-handler
 > Run Hapi server on AWS Lambda
 
+[![npm version](https://badge.fury.io/js/%40tepez%2Fhapi-lambda-handler.svg)](https://badge.fury.io/js/%40tepez%2Fhapi-lambda-handler)
+[![Build Status](https://secure.travis-ci.org/tepez/hapi-lambda-handler.svg?branch=master)](http://travis-ci.org/tepez/hapi-lambda-handler)
+
 ## Install
 
 ```
