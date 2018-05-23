@@ -30,7 +30,7 @@ exports.handler = HapiLambdaHandler.handlerFromServer(server);
 ## API
 
 ### `handlerFromServer(server, [injectOptions])`
-Return a Lambda handler function that handles event, context and callback as passed by a lambda-proxy integration of AWS Api Gateway.
+Return a Lambda Proxy handler function that handles event, context and callback as passed by a lambda-proxy integration of AWS Api Gateway.
 
 - `server`:
   The Hapi server or a promise to it if it has to be initialized first.

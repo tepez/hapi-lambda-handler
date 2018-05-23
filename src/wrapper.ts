@@ -3,7 +3,7 @@ import * as _ from 'lodash'
 import * as AwsLambda from 'aws-lambda'
 import * as Querystring from 'querystring'
 import * as Debug from 'debug'
-import { IInjectOptions } from './types';
+import { IInjectOptions } from './types'
 
 
 // We use the debug module to determine if we need to print the message, i.e. we check if debug.enable
@@ -111,7 +111,7 @@ const injectRequest = function (server: Hapi.Server,
  * @param {IInjectOptions} options
  * @returns {Handler}
  */
-export function handlerFromServer(server: Promise<Hapi.Server> | Hapi.Server, options?: IInjectOptions): AwsLambda.Handler {
+export function handlerFromServer(server: Promise<Hapi.Server> | Hapi.Server, options?: IInjectOptions): AwsLambda.ProxyHandler {
     let _server;
 
     options = options || {};
