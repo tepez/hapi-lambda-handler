@@ -219,8 +219,26 @@ describe('.handlerFromServer()', () => {
                     expect(spec.handlerResBody).toEqual({ status: 'ok' })
                 }).then(done, done.fail);
             });
-        });
 
+            it('should NOT fail when given headers=null',  (done) => {
+                spec.server.route(spec.mockRoute);
+                spec.event.headers = null;
+
+                spec.injectLambda().then(() => {
+                    expect(spec.handlerRes.statusCode).toBe(200);
+                    expect(spec.handlerRes.headers).toEqual({
+                        'content-type': 'application/json; charset=utf-8',
+                        'cache-control': 'no-cache',
+                        'content-length': 15,
+                        'vary': 'accept-encoding',
+                        'date': jasmine.any(String),
+                        'connection': 'keep-alive',
+                        'accept-ranges': 'bytes',
+                    });
+                    expect(spec.handlerResBody).toEqual({ status: 'ok' })
+                }).then(done, done.fail);
+            });
+        });
 
         describe('request tail', () => {
             it('should wait for request tail before returning', (done) => {

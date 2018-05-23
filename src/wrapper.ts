@@ -44,7 +44,7 @@ const injectRequest = function (server: Hapi.Server,
     const requestOptions: Hapi.InjectedRequestOptions = {
         method: event.httpMethod,
         url: url,
-        headers: event.headers,
+        headers: event.headers || {},
     };
 
     const qs = Querystring.stringify(event.queryStringParameters);
