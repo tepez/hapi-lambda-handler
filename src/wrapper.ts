@@ -1,8 +1,8 @@
+import * as AwsLambda from 'aws-lambda'
+import * as Debug from 'debug'
 import * as Hapi from 'hapi'
 import * as _ from 'lodash'
-import * as AwsLambda from 'aws-lambda'
 import * as Querystring from 'querystring'
-import * as Debug from 'debug'
 import { IInjectOptions } from './types'
 
 

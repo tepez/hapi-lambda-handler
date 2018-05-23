@@ -1,5 +1,5 @@
-import { handlerFromServer, IInjectOptions } from './index'
 import * as Hapi from 'hapi'
+import { handlerFromServer, IInjectOptions } from './index'
 
 
 interface ISpec {

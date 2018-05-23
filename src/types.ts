@@ -1,5 +1,5 @@
-import * as Hapi from 'hapi'
 import * as AwsLambda from 'aws-lambda'
+import * as Hapi from 'hapi'
 
 
 export interface IModidyRequestCb {
