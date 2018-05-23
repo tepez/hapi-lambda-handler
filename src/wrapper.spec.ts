@@ -26,22 +26,22 @@ describe('.handlerFromServer()', () => {
         spec.context = {};
 
         spec.event = spec.event = {
-            'resource': '/health',
-            'path': '/health',
-            'httpMethod': 'GET',
-            'headers': {
+            resource: '/health',
+            path: '/health',
+            httpMethod: 'GET',
+            headers: {
                 'mock-header': 'mock-value',
                 'user-agent': 'mock-user-agent',
-                'host': 'mock-host',
+                host: 'mock-host',
             },
-            'queryStringParameters': null,
-            'pathParameters': null,
-            'stageVariables': null,
-            'requestContext': {
+            queryStringParameters: null,
+            pathParameters: null,
+            stageVariables: null,
+            requestContext: {
                 // ...
             },
-            'body': '',
-            'isBase64Encoded': false,
+            body: '',
+            isBase64Encoded: false,
         };
 
         spec.injectLambda = () => {
@@ -188,7 +188,7 @@ describe('.handlerFromServer()', () => {
                         headers: {
                             'mock-header': 'mock-value',
                             'user-agent': 'mock-user-agent',
-                            'host': 'mock-host',
+                            host: 'mock-host',
                         },
                     })
                 }).then(done, done.fail);
@@ -210,9 +210,9 @@ describe('.handlerFromServer()', () => {
                         'content-type': 'application/json; charset=utf-8',
                         'cache-control': 'no-cache',
                         'content-length': 15,
-                        'vary': 'accept-encoding',
-                        'date': jasmine.any(String),
-                        'connection': 'keep-alive',
+                        vary: 'accept-encoding',
+                        date: jasmine.any(String),
+                        connection: 'keep-alive',
                         'mock-response-header': 'value',
                         'accept-ranges': 'bytes',
                     });
@@ -230,9 +230,9 @@ describe('.handlerFromServer()', () => {
                         'content-type': 'application/json; charset=utf-8',
                         'cache-control': 'no-cache',
                         'content-length': 15,
-                        'vary': 'accept-encoding',
-                        'date': jasmine.any(String),
-                        'connection': 'keep-alive',
+                        vary: 'accept-encoding',
+                        date: jasmine.any(String),
+                        connection: 'keep-alive',
                         'accept-ranges': 'bytes',
                     });
                     expect(spec.handlerResBody).toEqual({ status: 'ok' })
@@ -314,7 +314,7 @@ describe('.handlerFromServer()', () => {
                         headers: {
                             'mock-header': 'mock-value',
                             'user-agent': 'mock-user-agent',
-                            'host': 'mock-host',
+                            host: 'mock-host',
                         },
                     });
 
