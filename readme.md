@@ -17,9 +17,9 @@ npm install --save @tepez/hapi-lambda-handler
 const HapiLambdaHandler = require('@tepez/hapi-lambda-handler');
 const Hapi = require('hapi');
 
-spec.server = new Hapi.Server();
-spec.server.connection({});
-spec.server.route({
+cosnt server = new Hapi.Server();
+server.connection({});
+server.route({
     method: 'GET',
     path: '/health',
     handler: (request, reply) => reply({ status: 'ok' })
