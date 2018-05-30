@@ -15,6 +15,7 @@ npm install --save @tepez/hapi-lambda-handler
 ```
 // handler.js
 const HapiLambdaHandler = require('@tepez/hapi-lambda-handler');
+const Hapi = require('hapi');
 
 spec.server = new Hapi.Server();
 spec.server.connection({});
