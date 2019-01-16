@@ -1,4 +1,9 @@
-import { APIGatewayEvent, APIGatewayProxyHandler, APIGatewayProxyResult, Context } from 'aws-lambda'
+import {
+    APIGatewayEvent,
+    APIGatewayProxyEvent,
+    APIGatewayProxyResult,
+    Context,
+} from 'aws-lambda'
 import * as Debug from 'debug'
 import * as Hapi from 'hapi'
 import { Server, ServerInjectOptions } from 'hapi'
@@ -94,6 +99,10 @@ function isPromise<T>(val: any): val is Promise<T> {
     return typeof val.then === 'function'
 }
 
+
+// don't use APIGatewayProxyHandler since it currently doesn't work well with promises
+export type AsyncHandler = ((event: APIGatewayProxyEvent, context: any) => Promise<APIGatewayProxyResult>)
+
 /**
  * Given an Hapi server, return a AWS Lambda handler function that injects the events to it
  * as if they where regular HTTP requests
@@ -101,7 +110,7 @@ function isPromise<T>(val: any): val is Promise<T> {
  * @param {IInjectOptions} options
  * @returns {Handler}
  */
-export function handlerFromServer(server: Promise<Server> | Server, options?: IInjectOptions): APIGatewayProxyHandler {
+export function handlerFromServer(server: Promise<Server> | Server, options?: IInjectOptions): AsyncHandler {
     let _server: Server;
 
     options = options || {};
