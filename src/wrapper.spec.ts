@@ -1,12 +1,7 @@
-import {
-    APIGatewayEvent,
-    APIGatewayEventRequestContext,
-    APIGatewayProxyCallback,
-    APIGatewayProxyResult, Context,
-} from 'aws-lambda'
-import { PluginFunction, PluginRegistrationObject } from 'hapi'
+import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
 import * as Hapi from 'hapi'
-import { handlerFromServer, IInjectOptions } from './index'
+import { Plugin, Server, ServerRoute } from 'hapi'
+import { handlerFromServer, IInjectOptions, IRequestWithTailPromises } from './index'
 
 
 interface ISpec {
@@ -14,9 +9,9 @@ interface ISpec {
     context: any
 
     injectOptions: IInjectOptions
-    mockRoute: Hapi.RouteConfiguration
-    server: Hapi.Server
-    serverToWrap: Hapi.Server | Promise<Hapi.Server>
+    mockRoute: ServerRoute
+    server: Server
+    serverToWrap: Server | Promise<Server>
 
     injectLambda: () => Promise<void>
     handlerRes: APIGatewayProxyResult
@@ -52,11 +47,10 @@ describe('.handlerFromServer()', () => {
         spec.injectLambda = async () => {
             const handler = handlerFromServer(spec.serverToWrap, spec.injectOptions);
 
-
             spec.handlerRes = await handler(
                 spec.event as APIGatewayEvent,
                 spec.context as Context,
-                undefined       // pass undefined as cb since @types/aws-lambda wrongfully requires it
+                undefined,       // pass undefined as cb since @types/aws-lambda wrongfully requires it
             ) as APIGatewayProxyResult;
             if (spec.handlerRes.body) {
                 spec.handlerResBody = JSON.parse(spec.handlerRes.body);
@@ -66,29 +60,23 @@ describe('.handlerFromServer()', () => {
         spec.mockRoute = {
             method: 'GET',
             path: '/health',
-            handler: function (request, reply) {
-                reply({ status: 'ok' })
-            },
+            handler: (request) => ({ status: 'ok' }),
         };
 
-        spec.server = new Hapi.Server();
-        spec.server.connection({});
+        spec.server = new Server({
+            compression: false,
+        });
 
         spec.serverToWrap = spec.server;
     });
 
     describe('when given a promise to a server', () => {
         it('should inject when ready', (done) => {
-            const okInitPlugin: PluginRegistrationObject<void> = {
-                register: (server, options, next) => {
-                    process.nextTick(() => {
-                        spec.server.route(spec.mockRoute);
-                        next();
-                    });
+            const okInitPlugin: Plugin<void> = {
+                name: 'okInitPlugin',
+                register: (server, options) => {
+                    spec.server.route(spec.mockRoute);
                 },
-            };
-            okInitPlugin.register.attributes = {
-                name: 'mock-ok-init-plugin',
             };
 
             spec.serverToWrap = spec.server.register(okInitPlugin)
@@ -107,13 +95,11 @@ describe('.handlerFromServer()', () => {
         });
 
         it('should return 500 when there is an initialization error', async () => {
-            const initErrorPlugin: PluginRegistrationObject<void> = {
-                register: (server, options, next) => {
-                    process.nextTick(() => next(new Error('mock-init-error')));
+            const initErrorPlugin: Plugin<void> = {
+                name: 'initErrorPlugin',
+                register: (server, options) => {
+                    throw new Error('mock-init-error')
                 },
-            };
-            initErrorPlugin.register.attributes = {
-                name: 'mock-init-error-plugin',
             };
 
             spec.serverToWrap = spec.server.register(initErrorPlugin)
@@ -138,8 +124,8 @@ describe('.handlerFromServer()', () => {
     describe('when given a server', () => {
         describe('query string parameters', () => {
             beforeEach(() => {
-                spec.mockRoute.handler = (request, reply) => {
-                    reply({ query: request.query });
+                spec.mockRoute.handler = (request) => {
+                    return { query: request.query }
                 };
                 spec.server.route(spec.mockRoute);
             });
@@ -177,7 +163,7 @@ describe('.handlerFromServer()', () => {
             it('should remove the accept-encoding header from the request', async () => {
                 spec.event.headers['accept-encoding'] = 'gzip';
                 spec.mockRoute.handler = (request, reply) => {
-                    reply({ headers: request.headers })
+                    return { headers: request.headers }
                 };
                 spec.server.route(spec.mockRoute);
 
@@ -193,8 +179,8 @@ describe('.handlerFromServer()', () => {
             });
 
             it('should remove the transfer-encoding header from the response', async () => {
-                spec.mockRoute.handler = (request, reply) => {
-                    reply({ status: 'ok' })
+                spec.mockRoute.handler = (request, h) => {
+                    return h.response({ status: 'ok' })
                     // explicitly add the header
                         .header('transfer-encoding', 'chunked')
                         // add another header just for the sake of it
@@ -208,7 +194,6 @@ describe('.handlerFromServer()', () => {
                     'content-type': 'application/json; charset=utf-8',
                     'cache-control': 'no-cache',
                     'content-length': 15,
-                    vary: 'accept-encoding',
                     date: jasmine.any(String) as any,
                     connection: 'keep-alive',
                     'mock-response-header': 'value',
@@ -227,7 +212,6 @@ describe('.handlerFromServer()', () => {
                     'content-type': 'application/json; charset=utf-8',
                     'cache-control': 'no-cache',
                     'content-length': 15,
-                    vary: 'accept-encoding',
                     date: jasmine.any(String) as any,
                     connection: 'keep-alive',
                     'accept-ranges': 'bytes',
@@ -238,22 +222,22 @@ describe('.handlerFromServer()', () => {
 
         describe('request tail', () => {
             it('should wait for request tail before returning', (done) => {
-                let tailDone: () => void;
                 let lambdaReturned: boolean = false;
 
-                spec.mockRoute.handler = (request, reply) => {
-                    tailDone = request.tail('mock-tail');
-
-                    setTimeout(() => {
-                        if (lambdaReturned) {
-                            done.fail('Lambda returned before tail has finished');
-                        } else {
-                            tailDone();
-                        }
-                    }, 1000); // A second should be enough for the lambda to return if
-                    // it didn't wait for the tail
-
-                    reply({});
+                spec.mockRoute.handler = (request: IRequestWithTailPromises) => {
+                    if (!request.app.tailPromises) request.app.tailPromises = [];
+                    request.app.tailPromises.push(new Promise<void>((resolve) => {
+                        setTimeout(() => {
+                            if (lambdaReturned) {
+                                done.fail('Lambda returned before tail has finished');
+                            } else {
+                                resolve();
+                            }
+                            // A second should be enough for the lambda to return if
+                            // it didn't wait for the tail
+                        }, 1000);
+                    }));
+                    return {};
                 };
                 spec.server.route(spec.mockRoute);
 
@@ -279,7 +263,6 @@ describe('.handlerFromServer()', () => {
                 expect(spec.handlerResBody).toEqual({
                     status: 'ok',
                 })
-
             });
 
             it(`should return 404 if we don't provide the basePath`, async () => {
@@ -295,8 +278,8 @@ describe('.handlerFromServer()', () => {
 
         describe('modifyRequest function', () => {
             it('should call it before injecting the request', async () => {
-                spec.mockRoute.handler = (request, reply) => {
-                    reply({ credentials: request.auth.credentials });
+                spec.mockRoute.handler = (request) => {
+                    return { credentials: request.auth.credentials };
                 };
                 spec.server.route(spec.mockRoute);
 
@@ -313,15 +296,53 @@ describe('.handlerFromServer()', () => {
                         },
                     });
 
-                    request.credentials = 'mock-user'
+                    request.credentials = {
+                        user: 'mock-user',
+                    };
                 };
 
                 await spec.injectLambda();
                 expect(spec.handlerRes.statusCode).toBe(200);
                 expect(spec.handlerResBody).toEqual({
-                    credentials: 'mock-user',
+                    credentials: {
+                        user: 'mock-user',
+                    },
                 })
             });
+        });
+
+        it('should warn of compression is not disabled on the server', async () => {
+            const warnSpy = spyOn(console, 'warn');
+
+            spec.server = new Server({
+                compression: {
+                    // use minBytes so we can see that it sets the vary header to accept-encoding
+                    // which is not needed here since we never return gzipped responses
+                    // if gzip is added, it's added by APIGateway later
+                    minBytes: 1,
+                },
+            });
+            spec.server.route(spec.mockRoute);
+            spec.serverToWrap = spec.server;
+
+            spec.event.headers = null;
+
+            await spec.injectLambda();
+            expect(spec.handlerRes.statusCode).toBe(200);
+            expect(spec.handlerRes.headers).toEqual({
+                'content-type': 'application/json; charset=utf-8',
+                'cache-control': 'no-cache',
+                'content-length': 15,
+                date: jasmine.any(String) as any,
+                connection: 'keep-alive',
+                'accept-ranges': 'bytes',
+                vary: 'accept-encoding'
+            });
+
+            expect(warnSpy).toHaveBeenCalledTimes(1);
+            expect(warnSpy).toHaveBeenCalledWith(
+                'Since AWI gateway does not accept gzipped responses - set compression of the server to false'
+            );
         });
     });
 });

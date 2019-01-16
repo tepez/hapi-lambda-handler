@@ -1,10 +1,11 @@
 import { APIGatewayEvent, APIGatewayProxyHandler, APIGatewayProxyResult, Context } from 'aws-lambda'
 import * as Debug from 'debug'
 import * as Hapi from 'hapi'
+import { Server, ServerInjectOptions } from 'hapi'
 import * as _ from 'lodash'
 import * as Querystring from 'querystring'
 import { Headers } from 'shot'
-import { IInjectOptions } from './types'
+import { IInjectOptions, IRequestWithTailPromises } from './types'
 
 
 // We use the debug module to determine if we need to print the message, i.e. we check if debug.enable
@@ -20,7 +21,7 @@ function removeHeader(headers: Headers, headerName: string): void {
     }
 }
 
-async function injectRequest(server: Hapi.Server,
+async function injectRequest(server: Server,
                              options: IInjectOptions,
                              event: APIGatewayEvent,
                              context: Context): Promise<APIGatewayProxyResult> {
@@ -41,7 +42,7 @@ async function injectRequest(server: Hapi.Server,
         url = url.substr(options.basePath.length);
     }
 
-    const requestOptions: Hapi.InjectedRequestOptions = {
+    const requestOptions: ServerInjectOptions = {
         method: event.httpMethod,
         url: url,
         headers: event.headers || {},
@@ -64,17 +65,15 @@ async function injectRequest(server: Hapi.Server,
         options.modifyRequest(event, context, requestOptions);
     }
 
-    if (debug.enabled) {
-        console.log(`Injecting request:\n${JSON.stringify(requestOptions, null, 2)}`);
-    }
-
-    let tailReached = false;
-
-    // As the specs shows us, if there are no errors on the route, the tail will be called
-    // before the response
-    server.once('tail', () => tailReached = true);
+    debug('Injecting request:\n%j', requestOptions);
 
     const res = await server.inject(requestOptions);
+
+    const req = res.request as IRequestWithTailPromises;
+    if (req.app.tailPromises && req.app.tailPromises.length > 0) {
+        debug('Waiting for %d tail promises', req.app.tailPromises.length);
+        await Promise.all(req.app.tailPromises);
+    }
 
     // api gateway doesn't support chunked transfer-encoding
     // https://github.com/awslabs/aws-serverless-express/issues/10
@@ -82,23 +81,17 @@ async function injectRequest(server: Hapi.Server,
 
     const lambdaRes: APIGatewayProxyResult = {
         statusCode: res.statusCode,
-        headers: res.headers,
+        headers: res.headers as any, // TODO when can a header value be an array of string?
         body: res.payload,
     };
 
-    if (!tailReached) {
-        if (debug.enabled) {
-            console.log('Response is reading. Waiting for request tail');
-        }
-        await new Promise((resolve) => {
-            server.once('tail', resolve);
-        });
-    }
+    debug('Responding to Lambda with\n%j', lambdaRes);
 
-    if (debug.enabled) {
-        console.log(`Responding to Lambda with:\n${JSON.stringify(lambdaRes, null, 2)}`);
-    }
     return lambdaRes;
+}
+
+function isPromise<T>(val: any): val is Promise<T> {
+    return typeof val.then === 'function'
 }
 
 /**
@@ -108,17 +101,30 @@ async function injectRequest(server: Hapi.Server,
  * @param {IInjectOptions} options
  * @returns {Handler}
  */
-export function handlerFromServer(server: Promise<Hapi.Server> | Hapi.Server, options?: IInjectOptions): APIGatewayProxyHandler {
-    let _server: Hapi.Server;
+export function handlerFromServer(server: Promise<Server> | Server, options?: IInjectOptions): APIGatewayProxyHandler {
+    let _server: Server;
 
     options = options || {};
 
-    if (server instanceof Hapi.Server) {
-        _server = server;
-    } else {
-        server.then((server) => {
-            _server = server;
+    let serverChecked: boolean;
+
+    function checkServerConfig(server: Server) {
+        if (serverChecked) return;
+        if (server.settings.compression !== false) {
+            console.warn(`Since AWI gateway does not accept gzipped responses - set compression of the server to false`);
+        }
+        serverChecked = true;
+    }
+
+
+    if (isPromise(server)) {
+        server.then((resolvedServer) => {
+            _server = resolvedServer;
+            checkServerConfig(_server);
         })
+    } else {
+        _server = server;
+        checkServerConfig(_server);
     }
 
     return async function (event, context): Promise<APIGatewayProxyResult> {

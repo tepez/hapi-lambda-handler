@@ -36,8 +36,8 @@ Return a Lambda Proxy handler function that handles event, context and callback 
 - `server`:
   The Hapi server or a promise to it if it has to be initialized first.
 
-  It is the **responsibility** of the using package to report initialziation errors in the server.
-  If the promise to the server rejects, 500 errros will be returned for every request.
+  It is the **responsibility** of the using package to report initialization errors in the server.
+  If the promise to the server rejects, 500 errors will be returned for every request.
 
 - `injectOptions`:
     - `basePath: string`
@@ -45,7 +45,26 @@ Return a Lambda Proxy handler function that handles event, context and callback 
       If the API is deployed under a [custom path mapping](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-apigateway-basepathmapping.html)
       this should be the basePath, e.g. '/v1.0'.
 
-    - `modifyRequest: (event: AwsLambda.APIGatewayEvent, context: AwsLambda.Context, request: Hapi.InjectedRequestOptions) => void`
+    - `modifyRequest: (event: APIGatewayEvent, context: Context, request: ServerInjectOptions) => void`
 
       A synchronous callback receiving the `event`, the `context` and the `request` just before injecting it to the Hapi server.
       This is a chance to modify the request in-place, e.g. to apply credentials to it.
+
+## Request tail
+
+Sometimes we need to wait for some processes to finish before returning the response
+to APIGateway, e.g. report an error to Sentry.
+
+Hapi 17 [dropped support](https://github.com/hapijs/hapi/issues/3658) for request tails,
+which was the method we used before.
+
+You can create an array of promises on `request.app.tailPromises`, the handler will
+wait for them with `Promise.all()` before returning the response.
+
+```typescript
+function handler(request: IRequestWithTailPromises) => {
+    // ...
+    if (!request.app.tailPromises) request.app.tailPromises = [];
+    request.app.tailPromises.push(somePromise);
+}
+```

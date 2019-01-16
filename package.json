@@ -20,15 +20,15 @@
   "homepage": "https://github.com/tepez/hapi-lambda-handler#readme",
   "devDependencies": {
     "@tepez/typescript-build-gulp-tasks": "^3.1.0",
-    "@types/jasmine": "^2.8.2",
+    "@types/jasmine": "^3.3.5",
     "@types/lodash": "^4.14.119",
     "gulp": "^3.9.1",
-    "hapi": "^16.6.2"
+    "hapi": "^17.8.1"
   },
   "dependencies": {
     "@types/aws-lambda": "^8.10.17",
     "@types/debug": "0.0.31",
-    "@types/hapi": "^16.1.11",
+    "@types/hapi": "^17.8.2",
     "@types/node": "^8.0.58",
     "debug": "^4.1.1"
   }
