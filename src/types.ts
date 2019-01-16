@@ -1,10 +1,10 @@
-import * as AwsLambda from 'aws-lambda'
+import { APIGatewayEvent, APIGatewayProxyEvent, Context } from 'aws-lambda'
 import * as Hapi from 'hapi'
 
 
 export interface IModifyRequestCb {
-    (event: AwsLambda.APIGatewayEvent,
-     context: AwsLambda.Context,
+    (event: APIGatewayEvent,
+     context: Context,
      request: Hapi.InjectedRequestOptions): void
 }
 

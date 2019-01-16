@@ -21,6 +21,7 @@
   "devDependencies": {
     "@tepez/typescript-build-gulp-tasks": "^3.1.0",
     "@types/jasmine": "^2.8.2",
+    "@types/lodash": "^4.14.119",
     "gulp": "^3.9.1",
     "hapi": "^16.6.2"
   },

@@ -1,3 +1,10 @@
+import {
+    APIGatewayEvent,
+    APIGatewayEventRequestContext,
+    APIGatewayProxyCallback,
+    APIGatewayProxyResult, Context,
+} from 'aws-lambda'
+import { PluginFunction, PluginRegistrationObject } from 'hapi'
 import * as Hapi from 'hapi'
 import { handlerFromServer, IInjectOptions } from './index'
 
@@ -12,7 +19,7 @@ interface ISpec {
     serverToWrap: Hapi.Server | Promise<Hapi.Server>
 
     injectLambda: () => Promise<void>
-    handlerRes: any
+    handlerRes: APIGatewayProxyResult
     handlerResBody: any
 }
 
@@ -25,7 +32,7 @@ describe('.handlerFromServer()', () => {
         spec.injectOptions = {};
         spec.context = {};
 
-        spec.event = spec.event = {
+        spec.event = {
             resource: '/health',
             path: '/health',
             httpMethod: 'GET',
@@ -37,9 +44,7 @@ describe('.handlerFromServer()', () => {
             queryStringParameters: null,
             pathParameters: null,
             stageVariables: null,
-            requestContext: {
-                // ...
-            },
+            requestContext: null,
             body: '',
             isBase64Encoded: false,
         };
@@ -47,8 +52,12 @@ describe('.handlerFromServer()', () => {
         spec.injectLambda = async () => {
             const handler = handlerFromServer(spec.serverToWrap, spec.injectOptions);
 
-            // pass undefined as cb since @types/aws-lambda wrongfully requires it
-            spec.handlerRes = await handler(spec.event, spec.context, undefined);
+
+            spec.handlerRes = await handler(
+                spec.event as APIGatewayEvent,
+                spec.context as Context,
+                undefined       // pass undefined as cb since @types/aws-lambda wrongfully requires it
+            ) as APIGatewayProxyResult;
             if (spec.handlerRes.body) {
                 spec.handlerResBody = JSON.parse(spec.handlerRes.body);
             }
@@ -70,7 +79,7 @@ describe('.handlerFromServer()', () => {
 
     describe('when given a promise to a server', () => {
         it('should inject when ready', (done) => {
-            const okInitPlugin = {
+            const okInitPlugin: PluginRegistrationObject<void> = {
                 register: (server, options, next) => {
                     process.nextTick(() => {
                         spec.server.route(spec.mockRoute);
@@ -78,7 +87,7 @@ describe('.handlerFromServer()', () => {
                     });
                 },
             };
-            (okInitPlugin.register as any).attributes = {
+            okInitPlugin.register.attributes = {
                 name: 'mock-ok-init-plugin',
             };
 
@@ -98,12 +107,12 @@ describe('.handlerFromServer()', () => {
         });
 
         it('should return 500 when there is an initialization error', async () => {
-            const initErrorPlugin = {
+            const initErrorPlugin: PluginRegistrationObject<void> = {
                 register: (server, options, next) => {
                     process.nextTick(() => next(new Error('mock-init-error')));
                 },
             };
-            (initErrorPlugin.register as any).attributes = {
+            initErrorPlugin.register.attributes = {
                 name: 'mock-init-error-plugin',
             };
 
@@ -200,7 +209,7 @@ describe('.handlerFromServer()', () => {
                     'cache-control': 'no-cache',
                     'content-length': 15,
                     vary: 'accept-encoding',
-                    date: jasmine.any(String),
+                    date: jasmine.any(String) as any,
                     connection: 'keep-alive',
                     'mock-response-header': 'value',
                     'accept-ranges': 'bytes',
@@ -219,7 +228,7 @@ describe('.handlerFromServer()', () => {
                     'cache-control': 'no-cache',
                     'content-length': 15,
                     vary: 'accept-encoding',
-                    date: jasmine.any(String),
+                    date: jasmine.any(String) as any,
                     connection: 'keep-alive',
                     'accept-ranges': 'bytes',
                 });
@@ -229,7 +238,7 @@ describe('.handlerFromServer()', () => {
 
         describe('request tail', () => {
             it('should wait for request tail before returning', (done) => {
-                let tailDone;
+                let tailDone: () => void;
                 let lambdaReturned: boolean = false;
 
                 spec.mockRoute.handler = (request, reply) => {

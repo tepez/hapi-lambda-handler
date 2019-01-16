@@ -1,10 +1,9 @@
-import * as AwsLambda from 'aws-lambda';
-import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayEvent, APIGatewayProxyHandler, APIGatewayProxyResult, Context } from 'aws-lambda'
 import * as Debug from 'debug'
 import * as Hapi from 'hapi'
 import * as _ from 'lodash'
 import * as Querystring from 'querystring'
-import { Headers } from 'shot';
+import { Headers } from 'shot'
 import { IInjectOptions } from './types'
 
 
@@ -23,8 +22,8 @@ function removeHeader(headers: Headers, headerName: string): void {
 
 async function injectRequest(server: Hapi.Server,
                              options: IInjectOptions,
-                             event: AwsLambda.APIGatewayEvent,
-                             context: AwsLambda.Context): Promise<APIGatewayProxyResult> {
+                             event: APIGatewayEvent,
+                             context: Context): Promise<APIGatewayProxyResult> {
     if (debug.enabled) {
         console.log('Received Lambda request');
         console.log('Event:');
@@ -110,7 +109,7 @@ async function injectRequest(server: Hapi.Server,
  * @returns {Handler}
  */
 export function handlerFromServer(server: Promise<Hapi.Server> | Hapi.Server, options?: IInjectOptions): APIGatewayProxyHandler {
-    let _server;
+    let _server: Hapi.Server;
 
     options = options || {};
 
@@ -123,7 +122,7 @@ export function handlerFromServer(server: Promise<Hapi.Server> | Hapi.Server, op
     }
 
     return async function (event, context): Promise<APIGatewayProxyResult> {
-        if (!(_server instanceof Hapi.Server)) {
+        if (!_server) {
             try {
                 await server;
             } catch (_ignore) {
