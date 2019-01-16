@@ -13,22 +13,22 @@
     "url": "git+https://github.com/tepez/hapi-lambda-handler.git"
   },
   "author": "",
-  "license": "ISC",
+  "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/tepez/hapi-lambda-handler/issues"
   },
   "homepage": "https://github.com/tepez/hapi-lambda-handler#readme",
   "devDependencies": {
-    "@tepez/typescript-build-gulp-tasks": "^2.0.1",
+    "@tepez/typescript-build-gulp-tasks": "^3.1.0",
     "@types/jasmine": "^2.8.2",
     "gulp": "^3.9.1",
     "hapi": "^16.6.2"
   },
   "dependencies": {
-    "@types/aws-lambda": "0.0.23",
-    "@types/debug": "0.0.30",
+    "@types/aws-lambda": "^8.10.17",
+    "@types/debug": "0.0.31",
     "@types/hapi": "^16.1.11",
     "@types/node": "^8.0.58",
-    "debug": "^3.1.0"
+    "debug": "^4.1.1"
   }
 }

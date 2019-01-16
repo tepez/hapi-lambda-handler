@@ -2,7 +2,7 @@ import * as AwsLambda from 'aws-lambda'
 import * as Hapi from 'hapi'
 
 
-export interface IModidyRequestCb {
+export interface IModifyRequestCb {
     (event: AwsLambda.APIGatewayEvent,
      context: AwsLambda.Context,
      request: Hapi.InjectedRequestOptions): void
@@ -14,5 +14,5 @@ export interface IInjectOptions {
     basePath?: string
 
     // A sync callback for modifying the request before injecting it to Hapi
-    modifyRequest?: IModidyRequestCb
+    modifyRequest?: IModifyRequestCb
 }
