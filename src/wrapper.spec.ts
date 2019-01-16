@@ -11,7 +11,7 @@ interface ISpec {
     server: Hapi.Server
     serverToWrap: Hapi.Server | Promise<Hapi.Server>
 
-    injectLambda: () => Promise<Object>
+    injectLambda: () => Promise<void>
     handlerRes: any
     handlerResBody: any
 }
@@ -44,21 +44,14 @@ describe('.handlerFromServer()', () => {
             isBase64Encoded: false,
         };
 
-        spec.injectLambda = () => {
+        spec.injectLambda = async () => {
             const handler = handlerFromServer(spec.serverToWrap, spec.injectOptions);
-            return new Promise((resolve, reject) => {
-                handler(spec.event, spec.context, (err, res) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        spec.handlerRes = res as Object;
-                        if (spec.handlerRes.body) {
-                            spec.handlerResBody = JSON.parse(spec.handlerRes.body);
-                        }
-                        resolve();
-                    }
-                });
-            });
+
+            // pass undefined as cb since @types/aws-lambda wrongfully requires it
+            spec.handlerRes = await handler(spec.event, spec.context, undefined);
+            if (spec.handlerRes.body) {
+                spec.handlerResBody = JSON.parse(spec.handlerRes.body);
+            }
         };
 
         spec.mockRoute = {
