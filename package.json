@@ -5,8 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "gulp build-unit-test",
-    "update": "gulp build && np --no-publish --no-yarn"
+    "build": "npx gulp build",
+    "test": "npx gulp build-unit-test",
+    "update": "npx gulp build && npx np --no-publish --no-yarn"
   },
   "repository": {
     "type": "git",
@@ -19,17 +20,19 @@
   },
   "homepage": "https://github.com/tepez/hapi-lambda-handler#readme",
   "devDependencies": {
-    "@tepez/typescript-build-gulp-tasks": "^3.1.0",
-    "@types/jasmine": "^3.3.5",
-    "@types/lodash": "^4.14.119",
-    "gulp": "^3.9.1",
-    "hapi": "^17.8.1"
+    "@tepez/typescript-build-gulp-tasks": "^5.1.1",
+    "@tepez/typescript-common": "^0.2.1",
+    "@types/gulp": "^4.0.6",
+    "@types/jasmine": "^3.3.13",
+    "@types/lodash": "^4.14.132",
+    "gulp": "^4.0.2",
+    "hapi": "^17.8.5"
   },
   "dependencies": {
-    "@types/aws-lambda": "^8.10.17",
-    "@types/debug": "0.0.31",
-    "@types/hapi": "^17.8.2",
-    "@types/node": "^8.0.58",
+    "@types/aws-lambda": "^8.10.26",
+    "@types/debug": "^4.1.4",
+    "@types/hapi": "^17.8.6",
+    "@types/node": "^8.10.48",
     "debug": "^4.1.1"
   }
 }

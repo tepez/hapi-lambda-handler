@@ -1,11 +1,5 @@
-import {
-    APIGatewayEvent,
-    APIGatewayProxyEvent,
-    APIGatewayProxyResult,
-    Context,
-} from 'aws-lambda'
+import { APIGatewayEvent, APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
 import * as Debug from 'debug'
-import * as Hapi from 'hapi'
 import { Server, ServerInjectOptions } from 'hapi'
 import * as _ from 'lodash'
 import * as Querystring from 'querystring'
@@ -20,7 +14,7 @@ const debug = Debug('lambda-wrapper');
 
 function removeHeader(headers: Headers, headerName: string): void {
     const upperCaseHeader = headerName.toUpperCase();
-    const key = _.findKey(headers, (value, key) => key.toUpperCase() === upperCaseHeader);
+    const key = _.findKey(headers, (_value, key) => key.toUpperCase() === upperCaseHeader);
     if (key) {
         delete headers[key];
     }
@@ -127,9 +121,10 @@ export function handlerFromServer(server: Promise<Server> | Server, options?: II
 
 
     if (isPromise(server)) {
-        server.then((resolvedServer) => {
+        server = server.then((resolvedServer) => {
             _server = resolvedServer;
             checkServerConfig(_server);
+            return _server;
         })
     } else {
         _server = server;

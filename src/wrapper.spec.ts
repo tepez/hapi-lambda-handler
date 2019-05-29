@@ -1,5 +1,4 @@
 import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
-import * as Hapi from 'hapi'
 import { Plugin, Server, ServerRoute } from 'hapi'
 import { handlerFromServer, IInjectOptions, IRequestWithTailPromises } from './index'
 
@@ -20,8 +19,8 @@ interface ISpec {
 
 describe('.handlerFromServer()', () => {
     let spec: ISpec;
-    afterEach(() => spec = null);
-    beforeEach(function () {
+    afterEach((): void => spec = null);
+    beforeEach(function (this: ISpec) {
         spec = this;
 
         spec.injectOptions = {};
@@ -50,7 +49,6 @@ describe('.handlerFromServer()', () => {
             spec.handlerRes = await handler(
                 spec.event as APIGatewayEvent,
                 spec.context as Context,
-                undefined,       // pass undefined as cb since @types/aws-lambda wrongfully requires it
             ) as APIGatewayProxyResult;
             if (spec.handlerRes.body) {
                 spec.handlerResBody = JSON.parse(spec.handlerRes.body);
@@ -60,7 +58,7 @@ describe('.handlerFromServer()', () => {
         spec.mockRoute = {
             method: 'GET',
             path: '/health',
-            handler: (request) => ({ status: 'ok' }),
+            handler: () => ({ status: 'ok' }),
         };
 
         spec.server = new Server({
@@ -74,7 +72,7 @@ describe('.handlerFromServer()', () => {
         it('should inject when ready', (done) => {
             const okInitPlugin: Plugin<void> = {
                 name: 'okInitPlugin',
-                register: (server, options) => {
+                register: () => {
                     spec.server.route(spec.mockRoute);
                 },
             };
@@ -95,21 +93,26 @@ describe('.handlerFromServer()', () => {
         });
 
         it('should return 500 when there is an initialization error', async () => {
-            const initErrorPlugin: Plugin<void> = {
-                name: 'initErrorPlugin',
-                register: (server, options) => {
-                    throw new Error('mock-init-error')
-                },
-            };
 
-            spec.serverToWrap = spec.server.register(initErrorPlugin)
-                .then(() => spec.server)
-                .catch((err) => {
-                    // This is where you should handle, i.e. log, server init errors
+            // Return a promise to a server whose initialization will error
+            async function serverInitializationError(): Promise<Server> {
+                const initErrorPlugin: Plugin<void> = {
+                    name: 'initErrorPlugin',
+                    register: () => {
+                        throw new Error('mock-init-error')
+                    },
+                };
+
+                try {
+                    await spec.server.register(initErrorPlugin);
+                } catch (err) {
                     expect(err).toEqual(new Error('mock-init-error'));
-                    console.log(`Server init error: ${err.message}`);
-                    return Promise.reject(err);
-                });
+                    throw err;
+                }
+                return spec.server;
+            }
+
+            spec.serverToWrap = serverInitializationError();
 
             await spec.injectLambda();
             expect(spec.handlerRes.statusCode).toBe(500);
@@ -162,7 +165,7 @@ describe('.handlerFromServer()', () => {
         describe('headers', () => {
             it('should remove the accept-encoding header from the request', async () => {
                 spec.event.headers['accept-encoding'] = 'gzip';
-                spec.mockRoute.handler = (request, reply) => {
+                spec.mockRoute.handler = (request) => {
                     return { headers: request.headers }
                 };
                 spec.server.route(spec.mockRoute);
@@ -179,7 +182,7 @@ describe('.handlerFromServer()', () => {
             });
 
             it('should remove the transfer-encoding header from the response', async () => {
-                spec.mockRoute.handler = (request, h) => {
+                spec.mockRoute.handler = (_request, h) => {
                     return h.response({ status: 'ok' })
                     // explicitly add the header
                         .header('transfer-encoding', 'chunked')
@@ -336,12 +339,12 @@ describe('.handlerFromServer()', () => {
                 date: jasmine.any(String) as any,
                 connection: 'keep-alive',
                 'accept-ranges': 'bytes',
-                vary: 'accept-encoding'
+                vary: 'accept-encoding',
             });
 
             expect(warnSpy).toHaveBeenCalledTimes(1);
             expect(warnSpy).toHaveBeenCalledWith(
-                'Since AWI gateway does not accept gzipped responses - set compression of the server to false'
+                'Since AWI gateway does not accept gzipped responses - set compression of the server to false',
             );
         });
     });
