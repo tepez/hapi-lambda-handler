@@ -1,6 +1,6 @@
 {
   "name": "@tepez/hapi-lambda-handler",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Run Hapi server on AWS Lambda",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
