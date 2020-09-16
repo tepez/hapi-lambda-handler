@@ -20,17 +20,17 @@
   },
   "homepage": "https://github.com/tepez/hapi-lambda-handler#readme",
   "devDependencies": {
-    "@tepez/typescript-build-gulp-tasks": "^5.1.1",
-    "@tepez/typescript-common": "^0.2.1",
+    "@tepez/typescript-build-gulp-tasks": "^6.0.1",
+    "@tepez/typescript-common": "^0.2.2",
     "@types/gulp": "^4.0.6",
-    "@types/jasmine": "^3.3.13",
-    "@types/lodash": "^4.14.132",
+    "@types/jasmine": "^3.5.14",
+    "@types/lodash": "^4.14.161",
     "gulp": "^4.0.2",
     "hapi": "^17.8.5"
   },
   "dependencies": {
-    "@types/aws-lambda": "^8.10.26",
-    "@types/debug": "^4.1.4",
+    "@types/aws-lambda": "^8.10.62",
+    "@types/debug": "^4.1.5",
     "@types/hapi": "^17.8.6",
     "@types/node": "*",
     "debug": "^4.1.1"
