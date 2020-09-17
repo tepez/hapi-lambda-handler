@@ -1,10 +1,10 @@
-import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
 import { Plugin, Server, ServerRoute } from 'hapi'
+import { APIGatewayEvent, APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
 import { handlerFromServer, IInjectOptions, IRequestWithTailPromises } from './index'
 
 
 interface ISpec {
-    event: any
+    event: APIGatewayProxyEvent
     context: any
 
     injectOptions: IInjectOptions
@@ -35,13 +35,26 @@ describe('.handlerFromServer()', () => {
                 'user-agent': 'mock-user-agent',
                 host: 'mock-host',
             },
+            multiValueHeaders: {
+                'mock-header': [
+                    'mock-value',
+                ],
+                'user-agent': [
+                    'mock-user-agent',
+                ],
+                host: [
+                    'mock-host',
+                ],
+            },
+            multiValueQueryStringParameters: null,
             queryStringParameters: null,
             pathParameters: null,
             stageVariables: null,
             requestContext: null,
             body: '',
             isBase64Encoded: false,
-        };
+        } as APIGatewayProxyEvent;
+
 
         spec.injectLambda = async () => {
             const handler = handlerFromServer(spec.serverToWrap, spec.injectOptions);
@@ -149,27 +162,64 @@ describe('.handlerFromServer()', () => {
                         key1: 'value1',
                         key2: 'value2',
                     };
+                    spec.event.multiValueQueryStringParameters = {
+                        key1: [
+                            'value1',
+                        ],
+                        key2: [
+                            'value2',
+                            'value3',
+                        ],
+                    };
 
                     await spec.injectLambda();
                     expect(spec.handlerRes.statusCode).toBe(200);
                     expect(spec.handlerResBody).toEqual({
                         query: {
                             key1: 'value1',
-                            key2: 'value2',
+                            key2: [
+                                'value2',
+                                'value3',
+                            ],
                         },
                     });
                 });
             });
         });
 
-        describe('headers', () => {
-            it('should remove the accept-encoding header from the request', async () => {
+        describe('request headers', () => {
+            beforeEach(() => {
                 spec.event.headers['accept-encoding'] = 'gzip';
+                spec.event.multiValueHeaders['accept-encoding'] = [
+                    'gzip',
+                ];
+
                 spec.mockRoute.handler = (request) => {
                     return { headers: request.headers }
                 };
                 spec.server.route(spec.mockRoute);
+            });
 
+            it('should support multi var headers', async () => {
+                spec.event.multiValueHeaders['x-multi-value'] = [
+                    'value1',
+                    'value2',
+                ];
+                await spec.injectLambda();
+                expect(spec.handlerResBody).toEqual({
+                    headers: {
+                        'mock-header': 'mock-value',
+                        'user-agent': 'mock-user-agent',
+                        host: 'mock-host',
+                        'x-multi-value': [
+                            'value1',
+                            'value2',
+                        ],
+                    },
+                });
+            });
+
+            it('should remove the accept-encoding header from the request', async () => {
                 await spec.injectLambda();
                 expect(spec.handlerRes.statusCode).toBe(200);
                 expect(spec.handlerResBody).toEqual({
@@ -181,10 +231,48 @@ describe('.handlerFromServer()', () => {
                 });
             });
 
+            it('should NOT fail when given headers=null', async () => {
+                spec.event.headers = null;
+                spec.event.multiValueQueryStringParameters = null;
+
+                await spec.injectLambda();
+                expect(spec.handlerRes.statusCode).toBe(200);
+                expect(spec.handlerRes.headers).toBeUndefined();
+                expect(spec.handlerRes.multiValueHeaders).toEqual({
+                    'content-type': [
+                        'application/json; charset=utf-8',
+                    ],
+                    'cache-control': [
+                        'no-cache',
+                    ],
+                    'content-length': [
+                        90,
+                    ],
+                    date: [
+                        jasmine.any(String) as any,
+                    ],
+                    connection: [
+                        'keep-alive',
+                    ],
+                    'accept-ranges': [
+                        'bytes',
+                    ],
+                });
+                expect(spec.handlerResBody).toEqual({
+                    headers: {
+                        'mock-header': 'mock-value',
+                        'user-agent': 'mock-user-agent',
+                        host: 'mock-host',
+                    },
+                })
+            });
+        });
+
+        describe('response headers', () => {
             it('should remove the transfer-encoding header from the response', async () => {
                 spec.mockRoute.handler = (_request, h) => {
                     return h.response({ status: 'ok' })
-                    // explicitly add the header
+                        // explicitly add the header
                         .header('transfer-encoding', 'chunked')
                         // add another header just for the sake of it
                         .header('mock-response-header', 'value');
@@ -193,34 +281,34 @@ describe('.handlerFromServer()', () => {
 
                 await spec.injectLambda();
                 expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerRes.headers).toEqual({
-                    'content-type': 'application/json; charset=utf-8',
-                    'cache-control': 'no-cache',
-                    'content-length': 15,
-                    date: jasmine.any(String) as any,
-                    connection: 'keep-alive',
-                    'mock-response-header': 'value',
-                    'accept-ranges': 'bytes',
+                expect(spec.handlerRes.headers).toBeUndefined();
+                expect(spec.handlerRes.multiValueHeaders).toEqual({
+                    'content-type': [
+                        'application/json; charset=utf-8',
+                    ],
+                    'cache-control': [
+                        'no-cache',
+                    ],
+                    'content-length': [
+                        15,
+                    ],
+                    date: [
+                        jasmine.any(String) as any,
+                    ],
+                    connection: [
+                        'keep-alive',
+                    ],
+                    'mock-response-header': [
+                        'value',
+                    ],
+                    'accept-ranges': [
+                        'bytes',
+                    ],
                 });
                 expect(spec.handlerResBody).toEqual({ status: 'ok' })
             });
 
-            it('should NOT fail when given headers=null', async () => {
-                spec.server.route(spec.mockRoute);
-                spec.event.headers = null;
-
-                await spec.injectLambda();
-                expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerRes.headers).toEqual({
-                    'content-type': 'application/json; charset=utf-8',
-                    'cache-control': 'no-cache',
-                    'content-length': 15,
-                    date: jasmine.any(String) as any,
-                    connection: 'keep-alive',
-                    'accept-ranges': 'bytes',
-                });
-                expect(spec.handlerResBody).toEqual({ status: 'ok' })
-            });
+            it('should hander ')
         });
 
         describe('request tail', () => {
@@ -301,7 +389,7 @@ describe('.handlerFromServer()', () => {
 
                     request.credentials = {
                         user: 'mock-user',
-                    };
+                    }
                 };
 
                 await spec.injectLambda();
@@ -332,14 +420,29 @@ describe('.handlerFromServer()', () => {
 
             await spec.injectLambda();
             expect(spec.handlerRes.statusCode).toBe(200);
-            expect(spec.handlerRes.headers).toEqual({
-                'content-type': 'application/json; charset=utf-8',
-                'cache-control': 'no-cache',
-                'content-length': 15,
-                date: jasmine.any(String) as any,
-                connection: 'keep-alive',
-                'accept-ranges': 'bytes',
-                vary: 'accept-encoding',
+            expect(spec.handlerRes.headers).toBeUndefined();
+            expect(spec.handlerRes.multiValueHeaders).toEqual({
+                'content-type': [
+                    'application/json; charset=utf-8',
+                ],
+                'cache-control': [
+                    'no-cache',
+                ],
+                'content-length': [
+                    15,
+                ],
+                date: [
+                    jasmine.any(String) as any,
+                ],
+                connection: [
+                    'keep-alive',
+                ],
+                'accept-ranges': [
+                    'bytes',
+                ],
+                vary: [
+                    'accept-encoding',
+                ],
             });
 
             expect(warnSpy).toHaveBeenCalledTimes(1);

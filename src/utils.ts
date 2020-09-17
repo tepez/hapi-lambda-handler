@@ -30,10 +30,14 @@ export function eventToHapiRequest(event: APIGatewayEvent, basePath: string): Se
     const requestOptions: ServerInjectOptions = {
         method: event.httpMethod,
         url: url,
-        headers: event.headers || {},
+        headers: Object.entries(event.multiValueHeaders || {})
+            .reduce((collect, [name, value]) => ({
+                ...collect,
+                [name]: (value.length === 1) ? value[0] : value
+            }), {}),
     };
 
-    const qs = Querystring.stringify(event.queryStringParameters);
+    const qs = Querystring.stringify(event.multiValueQueryStringParameters);
     if (qs) {
         requestOptions.url += `?${qs}`;
     }
@@ -56,7 +60,11 @@ export function hapiResponseToResult(res: ServerInjectResponse): APIGatewayProxy
 
     return {
         statusCode: res.statusCode,
-        headers: res.headers as any, // TODO when can a header value be an array of string?
+        multiValueHeaders: Object.entries(res.headers)
+            .reduce((collect, [name, value]) => ({
+                ...collect,
+                [name]: [].concat(value)
+            }), {}),
         body: res.payload,
     };
 }
