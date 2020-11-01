@@ -1,11 +1,12 @@
-import { Plugin, Server, ServerRoute } from 'hapi'
 import { APIGatewayEvent, APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
+import { Plugin, Server, ServerRoute } from 'hapi'
 import { handlerFromServer, IInjectOptions, IRequestWithTailPromises } from './index'
+import { initStdoutSpec, stderr, stdout } from './stdoutSpec.spec';
 
 
 interface ISpec {
     event: APIGatewayProxyEvent
-    context: any
+    context: Context
 
     injectOptions: IInjectOptions
     mockRoute: ServerRoute
@@ -24,7 +25,9 @@ describe('.handlerFromServer()', () => {
         spec = this;
 
         spec.injectOptions = {};
-        spec.context = {};
+        spec.context = {
+            awsRequestId: 'mock-aws-request-id',
+        } as Context;
 
         spec.event = {
             resource: '/health',
@@ -80,6 +83,8 @@ describe('.handlerFromServer()', () => {
 
         spec.serverToWrap = spec.server;
     });
+
+    initStdoutSpec()
 
     describe('when given a promise to a server', () => {
         it('should inject when ready', (done) => {
@@ -449,6 +454,64 @@ describe('.handlerFromServer()', () => {
             expect(warnSpy).toHaveBeenCalledWith(
                 'Since AWI gateway does not accept gzipped responses - set compression of the server to false',
             );
+        });
+
+        describe('addStdoutPrefix', () => {
+            beforeEach(() => {
+                spec.mockRoute.handler = () => {
+                    console.log('stdout message')
+                    console.error('stderr message')
+                    return {};
+                };
+                spec.server.route(spec.mockRoute);
+            });
+
+            const testAddStdoutPrefix = () => {
+                it('should add a requestId prefix to every stdout and stderr', async () => {
+                    await spec.injectLambda();
+                    expect(stdout).toBe('(mock-aws-request-id) stdout message\n')
+                    expect(stderr).toBe('(mock-aws-request-id) stderr message\n')
+
+                    spec.context.awsRequestId = 'mock-aws-request-id-2';
+                    await spec.injectLambda();
+                    expect(stdout).toBe('(mock-aws-request-id) stdout message\n(mock-aws-request-id-2) stdout message\n')
+                    expect(stderr).toBe('(mock-aws-request-id) stderr message\n(mock-aws-request-id-2) stderr message\n')
+                });
+            };
+
+            const testNotAddStdoutPrefix = () => {
+                it('should NOT add a requestId prefix to every stdout and stderr', async () => {
+                    await spec.injectLambda();
+                    expect(stdout).toBe('stdout message\n')
+                    expect(stderr).toBe('stderr message\n')
+
+                    spec.context.awsRequestId = 'mock-aws-request-id-2';
+                    await spec.injectLambda();
+                    expect(stdout).toBe('stdout message\nstdout message\n')
+                    expect(stderr).toBe('stderr message\nstderr message\n')
+                });
+            };
+
+            describe('when not given', () => {
+                testAddStdoutPrefix();
+            });
+
+            describe('when true', () => {
+                beforeEach(() => {
+                    debugger
+                    spec.injectOptions.addStdoutPrefix = true;
+                });
+
+                testAddStdoutPrefix();
+            });
+
+            describe('when false', () => {
+                beforeEach(() => {
+                    spec.injectOptions.addStdoutPrefix = false;
+                });
+
+                testNotAddStdoutPrefix();
+            });
         });
     });
 });

@@ -3,9 +3,11 @@ import { Request, ServerInjectOptions } from 'hapi'
 
 
 export interface IModifyRequestCb {
-    (event: APIGatewayEvent,
-     context: Context,
-     request: ServerInjectOptions): void
+    (
+        event: APIGatewayEvent,
+        context: Context,
+        request: ServerInjectOptions,
+    ): void
 }
 
 export interface IInjectOptions {
@@ -19,6 +21,13 @@ export interface IInjectOptions {
      * A sync callback for modifying the request before injecting it to Hapi
      */
     modifyRequest?: IModifyRequestCb
+
+    /**
+     * Add the requestId to the prefix of every message printed to stdout and stderr
+     *
+     * @default true
+     */
+    addStdoutPrefix?: boolean
 }
 
 export interface IRequestWithTailPromises extends Request {
@@ -28,6 +37,6 @@ export interface IRequestWithTailPromises extends Request {
 }
 
 /**
- * Instead of APIGatewayProxyHandler froim @types/aws-lambda since it currently doesn't work well with promises
+ * Instead of APIGatewayProxyHandler from @types/aws-lambda since it currently doesn't work well with promises
  */
-export type AsyncHandler = ((event: APIGatewayProxyEvent, context: any) => Promise<APIGatewayProxyResult>)
+export type AsyncHandler = (event: APIGatewayProxyEvent, context: Context) => Promise<APIGatewayProxyResult>

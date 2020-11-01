@@ -1,6 +1,8 @@
+import { assignSame } from '@tepez/ts-utils'
 import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
 import * as Debug from 'debug'
 import { Server } from 'hapi'
+import { setStdoutPrefix } from './stdout';
 import { AsyncHandler, IInjectOptions, IRequestWithTailPromises } from './types'
 import { eventToHapiRequest, hapiResponseToResult, isPromise } from './utils';
 
@@ -57,18 +59,19 @@ async function injectRequest(
  */
 export function handlerFromServer(server: Promise<Server> | Server, options?: IInjectOptions): AsyncHandler {
     let _server: Server;
-
-    options = options || {};
+    const _options = assignSame<IInjectOptions>({
+        addStdoutPrefix: true,
+    }, options)
 
     let serverChecked: boolean;
 
-    function checkServerConfig(server: Server) {
+    const checkServerConfig = (server: Server): void => {
         if (serverChecked) return;
         if (server.settings.compression !== false) {
             console.warn(`Since AWI gateway does not accept gzipped responses - set compression of the server to false`);
         }
         serverChecked = true;
-    }
+    };
 
 
     if (isPromise(server)) {
@@ -82,23 +85,35 @@ export function handlerFromServer(server: Promise<Server> | Server, options?: II
         checkServerConfig(_server);
     }
 
-    return async function (event, context): Promise<APIGatewayProxyResult> {
-        if (!_server) {
-            try {
-                await server;
-            } catch (_ignore) {
-                // ignoring the error, it's the responsibility of the parent app to capture init errors
-                return {
-                    statusCode: 500,
-                    body: JSON.stringify({
-                        statusCode: 500,
-                        error: 'Internal Server Error',
-                        message: 'An internal server error occurred (Server initialization error)',
-                    }),
-                };
-            }
+    return async function (event, context) {
+        if (_options.addStdoutPrefix) {
+            // awsRequestId is the lambda request ID
+            // https://aws.amazon.com/blogs/compute/techniques-and-tools-for-better-serverless-api-logging-with-amazon-api-gateway-and-aws-lambda/#toc_1
+            setStdoutPrefix(`(${context.awsRequestId})`);
         }
 
-        return injectRequest(_server, options, event, context);
+        try {
+            if (!_server) {
+                try {
+                    await server;
+                } catch (_ignore) {
+                    // ignoring the error, it's the responsibility of the parent app to capture init errors
+                    return {
+                        statusCode: 500,
+                        body: JSON.stringify({
+                            statusCode: 500,
+                            error: 'Internal Server Error',
+                            message: 'An internal server error occurred (Server initialization error)',
+                        }),
+                    };
+                }
+            }
+
+            return await injectRequest(_server, _options, event, context);
+        } finally {
+            if (_options.addStdoutPrefix) {
+                setStdoutPrefix(null);
+            }
+        }
     };
 }

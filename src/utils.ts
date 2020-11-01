@@ -33,7 +33,7 @@ export function eventToHapiRequest(event: APIGatewayEvent, basePath: string): Se
         headers: Object.entries(event.multiValueHeaders || {})
             .reduce((collect, [name, value]) => ({
                 ...collect,
-                [name]: (value.length === 1) ? value[0] : value
+                [name]: (value.length === 1) ? value[0] : value,
             }), {}),
     };
 
@@ -63,7 +63,7 @@ export function hapiResponseToResult(res: ServerInjectResponse): APIGatewayProxy
         multiValueHeaders: Object.entries(res.headers)
             .reduce((collect, [name, value]) => ({
                 ...collect,
-                [name]: [].concat(value)
+                [name]: [].concat(value),
             }), {}),
         body: res.payload,
     };
