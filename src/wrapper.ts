@@ -2,7 +2,6 @@ import { assignSame } from '@tepez/ts-utils'
 import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
 import * as Debug from 'debug'
 import { Server } from 'hapi'
-import { setStdoutPrefix } from './stdout';
 import { AsyncHandler, IInjectOptions, IRequestWithTailPromises } from './types'
 import { eventToHapiRequest, hapiResponseToResult, isPromise } from './utils';
 
@@ -59,9 +58,7 @@ async function injectRequest(
  */
 export function handlerFromServer(server: Promise<Server> | Server, options?: IInjectOptions): AsyncHandler {
     let _server: Server;
-    const _options = assignSame<IInjectOptions>({
-        addStdoutPrefix: true,
-    }, options)
+    const _options = assignSame<IInjectOptions>({}, options)
 
     let serverChecked: boolean;
 
@@ -86,34 +83,22 @@ export function handlerFromServer(server: Promise<Server> | Server, options?: II
     }
 
     return async function (event, context) {
-        if (_options.addStdoutPrefix) {
-            // awsRequestId is the lambda request ID
-            // https://aws.amazon.com/blogs/compute/techniques-and-tools-for-better-serverless-api-logging-with-amazon-api-gateway-and-aws-lambda/#toc_1
-            setStdoutPrefix(`(${context.awsRequestId})`);
-        }
-
-        try {
-            if (!_server) {
-                try {
-                    await server;
-                } catch (_ignore) {
-                    // ignoring the error, it's the responsibility of the parent app to capture init errors
-                    return {
+        if (!_server) {
+            try {
+                await server;
+            } catch (_ignore) {
+                // ignoring the error, it's the responsibility of the parent app to capture init errors
+                return {
+                    statusCode: 500,
+                    body: JSON.stringify({
                         statusCode: 500,
-                        body: JSON.stringify({
-                            statusCode: 500,
-                            error: 'Internal Server Error',
-                            message: 'An internal server error occurred (Server initialization error)',
-                        }),
-                    };
-                }
-            }
-
-            return await injectRequest(_server, _options, event, context);
-        } finally {
-            if (_options.addStdoutPrefix) {
-                setStdoutPrefix(null);
+                        error: 'Internal Server Error',
+                        message: 'An internal server error occurred (Server initialization error)',
+                    }),
+                };
             }
         }
+
+        return await injectRequest(_server, _options, event, context);
     };
 }

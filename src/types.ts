@@ -21,13 +21,6 @@ export interface IInjectOptions {
      * A sync callback for modifying the request before injecting it to Hapi
      */
     modifyRequest?: IModifyRequestCb
-
-    /**
-     * Add the requestId to the prefix of every message printed to stdout and stderr
-     *
-     * @default true
-     */
-    addStdoutPrefix?: boolean
 }
 
 export interface IRequestWithTailPromises extends Request {
