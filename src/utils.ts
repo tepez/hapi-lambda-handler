@@ -17,6 +17,18 @@ export function isPromise<T>(val: any): val is Promise<T> {
     return typeof val.then === 'function'
 }
 
+/**
+ * Determine the real user IP from a request
+ * If the x-forwarded-for header is present, take the first IP there
+ */
+export const realUserIp = (event: APIGatewayEvent): string => {
+    const forwardedFor = event.multiValueHeaders?.['x-forwarded-for'];
+    if (forwardedFor && forwardedFor.length === 1) {
+        return forwardedFor[0].split(/\s*,\s*/)[0];
+    }
+    return null;
+};
+
 export function eventToHapiRequest(event: APIGatewayEvent, basePath: string): ServerInjectOptions {
     let url = event.path;
 
@@ -36,6 +48,9 @@ export function eventToHapiRequest(event: APIGatewayEvent, basePath: string): Se
                 [name]: (value.length === 1) ? value[0] : value,
             }), {}),
     };
+
+    const remoteAddress = realUserIp(event);
+    if (remoteAddress) requestOptions.remoteAddress = remoteAddress;
 
     const qs = Querystring.stringify(event.multiValueQueryStringParameters);
     if (qs) {

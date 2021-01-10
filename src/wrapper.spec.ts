@@ -270,6 +270,32 @@ describe('.handlerFromServer()', () => {
             });
         });
 
+        describe('client ip', () => {
+            beforeEach(() => {
+                spec.mockRoute.handler = (request) => {
+                    return { remoteAddress: request.info.remoteAddress }
+                };
+                spec.server.route(spec.mockRoute);
+            });
+
+            it('should default to 127.0.0.1', async () => {
+                await spec.injectLambda();
+                expect(spec.handlerResBody).toEqual({
+                    remoteAddress: '127.0.0.1'
+                });
+            });
+
+            it('should get IP address from x-forwarded-for header', async () => {
+                spec.event.multiValueHeaders['x-forwarded-for'] = [
+                    '85.250.108.184, 130.176.1.95, 130.176.1.72'
+                ];
+                await spec.injectLambda();
+                expect(spec.handlerResBody).toEqual({
+                    remoteAddress: '85.250.108.184'
+                });
+            });
+        });
+
         describe('response headers', () => {
             it('should remove the transfer-encoding header from the response', async () => {
                 spec.mockRoute.handler = (_request, h) => {
@@ -309,8 +335,6 @@ describe('.handlerFromServer()', () => {
                 });
                 expect(spec.handlerResBody).toEqual({ status: 'ok' })
             });
-
-            it('should hander ')
         });
 
         describe('request tail', () => {
