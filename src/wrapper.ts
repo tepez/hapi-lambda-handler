@@ -1,7 +1,7 @@
+import { Server } from '@hapi/hapi'
 import { assignSame } from '@tepez/ts-utils'
 import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
 import * as Debug from 'debug'
-import { Server } from 'hapi'
 import { AsyncHandler, IInjectOptions, IRequestWithTailPromises } from './types'
 import { eventToHapiRequest, hapiResponseToResult, isPromise } from './utils';
 

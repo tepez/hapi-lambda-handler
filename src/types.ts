@@ -1,5 +1,5 @@
+import { Request, ServerInjectOptions } from '@hapi/hapi'
 import { APIGatewayEvent, APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
-import { Request, ServerInjectOptions } from 'hapi'
 
 
 export interface IModifyRequestCb {

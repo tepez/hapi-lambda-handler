@@ -1,5 +1,5 @@
+import { Plugin, Server, ServerRoute } from '@hapi/hapi'
 import { APIGatewayEvent, APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
-import { Plugin, Server, ServerRoute } from 'hapi'
 import { handlerFromServer, IInjectOptions, IRequestWithTailPromises } from './index'
 
 
@@ -281,17 +281,17 @@ describe('.handlerFromServer()', () => {
             it('should default to 127.0.0.1', async () => {
                 await spec.injectLambda();
                 expect(spec.handlerResBody).toEqual({
-                    remoteAddress: '127.0.0.1'
+                    remoteAddress: '127.0.0.1',
                 });
             });
 
             it('should get IP address from x-forwarded-for header', async () => {
                 spec.event.multiValueHeaders['x-forwarded-for'] = [
-                    '85.250.108.184, 130.176.1.95, 130.176.1.72'
+                    '85.250.108.184, 130.176.1.95, 130.176.1.72',
                 ];
                 await spec.injectLambda();
                 expect(spec.handlerResBody).toEqual({
-                    remoteAddress: '85.250.108.184'
+                    remoteAddress: '85.250.108.184',
                 });
             });
         });
@@ -413,8 +413,11 @@ describe('.handlerFromServer()', () => {
                         },
                     });
 
-                    request.credentials = {
-                        user: 'mock-user',
+                    request.auth = {
+                        strategy: 'default',
+                        credentials: {
+                            user: 'mock-user',
+                        },
                     }
                 };
 

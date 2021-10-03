@@ -1,8 +1,8 @@
+import { ServerInjectOptions, ServerInjectResponse } from '@hapi/hapi';
+import { Headers } from '@hapi/shot';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { ServerInjectOptions, ServerInjectResponse } from 'hapi';
 import * as _ from 'lodash';
 import * as Querystring from 'querystring';
-import { Headers } from 'shot';
 
 
 export function removeHeader(headers: Headers, headerName: string): void {
