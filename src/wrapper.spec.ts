@@ -233,6 +233,23 @@ describe('.handlerFromServer()', () => {
                 });
             });
 
+            it('should remove the accept-encoding header from the request, even when upper cased', async () => {
+                spec.event.headers['Accept-Encoding'] = 'gzip';
+                spec.event.multiValueHeaders['Accept-Encoding'] = [
+                    'gzip',
+                ];
+
+                await spec.injectLambda();
+                expect(spec.handlerRes.statusCode).toBe(200);
+                expect(spec.handlerResBody).toEqual({
+                    headers: {
+                        'mock-header': 'mock-value',
+                        'user-agent': 'mock-user-agent',
+                        host: 'mock-host',
+                    },
+                });
+            });
+
             it('should NOT fail when given headers=null', async () => {
                 spec.event.headers = null;
                 spec.event.multiValueQueryStringParameters = null;
@@ -287,6 +304,16 @@ describe('.handlerFromServer()', () => {
 
             it('should get IP address from x-forwarded-for header', async () => {
                 spec.event.multiValueHeaders['x-forwarded-for'] = [
+                    '85.250.108.184, 130.176.1.95, 130.176.1.72',
+                ];
+                await spec.injectLambda();
+                expect(spec.handlerResBody).toEqual({
+                    remoteAddress: '85.250.108.184',
+                });
+            });
+
+            it('should get IP address from x-forwarded-for header, even whe upper cased', async () => {
+                spec.event.multiValueHeaders['X-Forwarded-For'] = [
                     '85.250.108.184, 130.176.1.95, 130.176.1.72',
                 ];
                 await spec.injectLambda();
