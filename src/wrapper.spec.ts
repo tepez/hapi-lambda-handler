@@ -1,107 +1,30 @@
-import { Plugin, Server, ServerRoute } from '@hapi/hapi'
-import { APIGatewayEvent, APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
-import { handlerFromServer, IInjectOptions, IRequestWithTailPromises } from './index'
+import { Plugin, Server } from '@hapi/hapi'
+import { IRequestWithTailPromises } from './index'
+import { initWrapperSpec, injectLambda, wrapperSpec } from './spec/wrapperSpec';
 
-
-interface ISpec {
-    event: APIGatewayProxyEvent
-    context: Context
-
-    injectOptions: IInjectOptions
-    mockRoute: ServerRoute
-    server: Server
-    serverToWrap: Server | Promise<Server>
-
-    injectLambda: () => Promise<void>
-    handlerRes: APIGatewayProxyResult
-    handlerResBody: any
-}
 
 describe('.handlerFromServer()', () => {
-    let spec: ISpec;
-    afterEach((): void => spec = null);
-    beforeEach(function (this: ISpec) {
-        spec = this;
-
-        spec.injectOptions = {};
-        spec.context = {
-            awsRequestId: 'mock-aws-request-id',
-        } as Context;
-
-        spec.event = {
-            resource: '/health',
-            path: '/health',
-            httpMethod: 'GET',
-            headers: {
-                'mock-header': 'mock-value',
-                'user-agent': 'mock-user-agent',
-                host: 'mock-host',
-            },
-            multiValueHeaders: {
-                'mock-header': [
-                    'mock-value',
-                ],
-                'user-agent': [
-                    'mock-user-agent',
-                ],
-                host: [
-                    'mock-host',
-                ],
-            },
-            multiValueQueryStringParameters: null,
-            queryStringParameters: null,
-            pathParameters: null,
-            stageVariables: null,
-            requestContext: null,
-            body: '',
-            isBase64Encoded: false,
-        } as APIGatewayProxyEvent;
-
-
-        spec.injectLambda = async () => {
-            const handler = handlerFromServer(spec.serverToWrap, spec.injectOptions);
-
-            spec.handlerRes = await handler(
-                spec.event as APIGatewayEvent,
-                spec.context as Context,
-            ) as APIGatewayProxyResult;
-            if (spec.handlerRes.body) {
-                spec.handlerResBody = JSON.parse(spec.handlerRes.body);
-            }
-        };
-
-        spec.mockRoute = {
-            method: 'GET',
-            path: '/health',
-            handler: () => ({ status: 'ok' }),
-        };
-
-        spec.server = new Server({
-            compression: false,
-        });
-
-        spec.serverToWrap = spec.server;
-    });
+    initWrapperSpec();
 
     describe('when given a promise to a server', () => {
         it('should inject when ready', (done) => {
             const okInitPlugin: Plugin<void> = {
                 name: 'okInitPlugin',
                 register: () => {
-                    spec.server.route(spec.mockRoute);
+                    wrapperSpec.server.route(wrapperSpec.mockRoute);
                 },
             };
 
-            spec.serverToWrap = spec.server.register(okInitPlugin)
-                .then(() => spec.server)
+            wrapperSpec.serverToWrap = wrapperSpec.server.register(okInitPlugin)
+                .then(() => wrapperSpec.server)
                 .catch((err) => {
                     done.fail(err);
                     return Promise.reject(err);
                 });
 
-            spec.injectLambda().then(() => {
-                expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerResBody).toEqual({
+            injectLambda().then(() => {
+                expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                expect(wrapperSpec.handlerResBody).toEqual({
                     status: 'ok',
                 })
             }).then(done, done.fail);
@@ -119,19 +42,19 @@ describe('.handlerFromServer()', () => {
                 };
 
                 try {
-                    await spec.server.register(initErrorPlugin);
+                    await wrapperSpec.server.register(initErrorPlugin);
                 } catch (err) {
                     expect(err).toEqual(new Error('mock-init-error'));
                     throw err;
                 }
-                return spec.server;
+                return wrapperSpec.server;
             }
 
-            spec.serverToWrap = serverInitializationError();
+            wrapperSpec.serverToWrap = serverInitializationError();
 
-            await spec.injectLambda();
-            expect(spec.handlerRes.statusCode).toBe(500);
-            expect(spec.handlerResBody).toEqual({
+            await injectLambda();
+            expect(wrapperSpec.handlerRes.statusCode).toBe(500);
+            expect(wrapperSpec.handlerResBody).toEqual({
                 statusCode: 500,
                 error: 'Internal Server Error',
                 message: 'An internal server error occurred (Server initialization error)',
@@ -142,17 +65,17 @@ describe('.handlerFromServer()', () => {
     describe('when given a server', () => {
         describe('query string parameters', () => {
             beforeEach(() => {
-                spec.mockRoute.handler = (request) => {
+                wrapperSpec.mockRoute.handler = (request) => {
                     return { query: request.query }
                 };
-                spec.server.route(spec.mockRoute);
+                wrapperSpec.server.route(wrapperSpec.mockRoute);
             });
 
             describe('when there are no query string parameters', () => {
                 it('should pass empty query to hapi', async () => {
-                    await spec.injectLambda();
-                    expect(spec.handlerRes.statusCode).toBe(200);
-                    expect(spec.handlerResBody).toEqual({
+                    await injectLambda();
+                    expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                    expect(wrapperSpec.handlerResBody).toEqual({
                         query: {},
                     });
                 });
@@ -160,11 +83,11 @@ describe('.handlerFromServer()', () => {
 
             describe('when there are query string parameters', () => {
                 it('should pass them to hapi', async () => {
-                    spec.event.queryStringParameters = {
+                    wrapperSpec.event.queryStringParameters = {
                         key1: 'value1',
                         key2: 'value2',
                     };
-                    spec.event.multiValueQueryStringParameters = {
+                    wrapperSpec.event.multiValueQueryStringParameters = {
                         key1: [
                             'value1',
                         ],
@@ -174,9 +97,9 @@ describe('.handlerFromServer()', () => {
                         ],
                     };
 
-                    await spec.injectLambda();
-                    expect(spec.handlerRes.statusCode).toBe(200);
-                    expect(spec.handlerResBody).toEqual({
+                    await injectLambda();
+                    expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                    expect(wrapperSpec.handlerResBody).toEqual({
                         query: {
                             key1: 'value1',
                             key2: [
@@ -191,24 +114,24 @@ describe('.handlerFromServer()', () => {
 
         describe('request headers', () => {
             beforeEach(() => {
-                spec.event.headers['accept-encoding'] = 'gzip';
-                spec.event.multiValueHeaders['accept-encoding'] = [
+                wrapperSpec.event.headers['accept-encoding'] = 'gzip';
+                wrapperSpec.event.multiValueHeaders['accept-encoding'] = [
                     'gzip',
                 ];
 
-                spec.mockRoute.handler = (request) => {
+                wrapperSpec.mockRoute.handler = (request) => {
                     return { headers: request.headers }
                 };
-                spec.server.route(spec.mockRoute);
+                wrapperSpec.server.route(wrapperSpec.mockRoute);
             });
 
             it('should support multi var headers', async () => {
-                spec.event.multiValueHeaders['x-multi-value'] = [
+                wrapperSpec.event.multiValueHeaders['x-multi-value'] = [
                     'value1',
                     'value2',
                 ];
-                await spec.injectLambda();
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerResBody).toEqual({
                     headers: {
                         'mock-header': 'mock-value',
                         'user-agent': 'mock-user-agent',
@@ -222,9 +145,9 @@ describe('.handlerFromServer()', () => {
             });
 
             it('should remove the accept-encoding header from the request', async () => {
-                await spec.injectLambda();
-                expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                expect(wrapperSpec.handlerResBody).toEqual({
                     headers: {
                         'mock-header': 'mock-value',
                         'user-agent': 'mock-user-agent',
@@ -234,14 +157,14 @@ describe('.handlerFromServer()', () => {
             });
 
             it('should remove the accept-encoding header from the request, even when upper cased', async () => {
-                spec.event.headers['Accept-Encoding'] = 'gzip';
-                spec.event.multiValueHeaders['Accept-Encoding'] = [
+                wrapperSpec.event.headers['Accept-Encoding'] = 'gzip';
+                wrapperSpec.event.multiValueHeaders['Accept-Encoding'] = [
                     'gzip',
                 ];
 
-                await spec.injectLambda();
-                expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                expect(wrapperSpec.handlerResBody).toEqual({
                     headers: {
                         'mock-header': 'mock-value',
                         'user-agent': 'mock-user-agent',
@@ -251,13 +174,13 @@ describe('.handlerFromServer()', () => {
             });
 
             it('should NOT fail when given headers=null', async () => {
-                spec.event.headers = null;
-                spec.event.multiValueQueryStringParameters = null;
+                wrapperSpec.event.headers = null;
+                wrapperSpec.event.multiValueQueryStringParameters = null;
 
-                await spec.injectLambda();
-                expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerRes.headers).toBeUndefined();
-                expect(spec.handlerRes.multiValueHeaders).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                expect(wrapperSpec.handlerRes.headers).toBeUndefined();
+                expect(wrapperSpec.handlerRes.multiValueHeaders).toEqual({
                     'content-type': [
                         'application/json; charset=utf-8',
                     ],
@@ -277,7 +200,7 @@ describe('.handlerFromServer()', () => {
                         'bytes',
                     ],
                 });
-                expect(spec.handlerResBody).toEqual({
+                expect(wrapperSpec.handlerResBody).toEqual({
                     headers: {
                         'mock-header': 'mock-value',
                         'user-agent': 'mock-user-agent',
@@ -289,35 +212,35 @@ describe('.handlerFromServer()', () => {
 
         describe('client ip', () => {
             beforeEach(() => {
-                spec.mockRoute.handler = (request) => {
+                wrapperSpec.mockRoute.handler = (request) => {
                     return { remoteAddress: request.info.remoteAddress }
                 };
-                spec.server.route(spec.mockRoute);
+                wrapperSpec.server.route(wrapperSpec.mockRoute);
             });
 
             it('should default to 127.0.0.1', async () => {
-                await spec.injectLambda();
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerResBody).toEqual({
                     remoteAddress: '127.0.0.1',
                 });
             });
 
             it('should get IP address from x-forwarded-for header', async () => {
-                spec.event.multiValueHeaders['x-forwarded-for'] = [
+                wrapperSpec.event.multiValueHeaders['x-forwarded-for'] = [
                     '85.250.108.184, 130.176.1.95, 130.176.1.72',
                 ];
-                await spec.injectLambda();
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerResBody).toEqual({
                     remoteAddress: '85.250.108.184',
                 });
             });
 
             it('should get IP address from x-forwarded-for header, even whe upper cased', async () => {
-                spec.event.multiValueHeaders['X-Forwarded-For'] = [
+                wrapperSpec.event.multiValueHeaders['X-Forwarded-For'] = [
                     '85.250.108.184, 130.176.1.95, 130.176.1.72',
                 ];
-                await spec.injectLambda();
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerResBody).toEqual({
                     remoteAddress: '85.250.108.184',
                 });
             });
@@ -325,19 +248,19 @@ describe('.handlerFromServer()', () => {
 
         describe('response headers', () => {
             it('should remove the transfer-encoding header from the response', async () => {
-                spec.mockRoute.handler = (_request, h) => {
+                wrapperSpec.mockRoute.handler = (_request, h) => {
                     return h.response({ status: 'ok' })
                         // explicitly add the header
                         .header('transfer-encoding', 'chunked')
                         // add another header just for the sake of it
                         .header('mock-response-header', 'value');
                 };
-                spec.server.route(spec.mockRoute);
+                wrapperSpec.server.route(wrapperSpec.mockRoute);
 
-                await spec.injectLambda();
-                expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerRes.headers).toBeUndefined();
-                expect(spec.handlerRes.multiValueHeaders).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                expect(wrapperSpec.handlerRes.headers).toBeUndefined();
+                expect(wrapperSpec.handlerRes.multiValueHeaders).toEqual({
                     'content-type': [
                         'application/json; charset=utf-8',
                     ],
@@ -360,7 +283,7 @@ describe('.handlerFromServer()', () => {
                         'bytes',
                     ],
                 });
-                expect(spec.handlerResBody).toEqual({ status: 'ok' })
+                expect(wrapperSpec.handlerResBody).toEqual({ status: 'ok' })
             });
         });
 
@@ -368,7 +291,7 @@ describe('.handlerFromServer()', () => {
             it('should wait for request tail before returning', (done) => {
                 let lambdaReturned: boolean = false;
 
-                spec.mockRoute.handler = (request: IRequestWithTailPromises) => {
+                wrapperSpec.mockRoute.handler = (request: IRequestWithTailPromises) => {
                     if (!request.app.tailPromises) request.app.tailPromises = [];
                     request.app.tailPromises.push(new Promise<void>((resolve) => {
                         setTimeout(() => {
@@ -383,36 +306,36 @@ describe('.handlerFromServer()', () => {
                     }));
                     return {};
                 };
-                spec.server.route(spec.mockRoute);
+                wrapperSpec.server.route(wrapperSpec.mockRoute);
 
-                spec.injectLambda().then(() => {
+                injectLambda().then(() => {
                     lambdaReturned = true;
-                    expect(spec.handlerRes.statusCode).toBe(200);
-                    expect(spec.handlerResBody).toEqual({})
+                    expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                    expect(wrapperSpec.handlerResBody).toEqual({})
                 }).then(done, done.fail);
             });
         });
 
         describe('basePath', () => {
             beforeEach(() => {
-                spec.server.route(spec.mockRoute);
-                spec.event.path = `/mock-base-path${spec.event.path}`;
+                wrapperSpec.server.route(wrapperSpec.mockRoute);
+                wrapperSpec.event.path = `/mock-base-path${wrapperSpec.event.path}`;
             });
 
             it('should strip basePath from the event URL', async () => {
-                spec.injectOptions.basePath = '/mock-base-path';
+                wrapperSpec.injectOptions.basePath = '/mock-base-path';
 
-                await spec.injectLambda();
-                expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                expect(wrapperSpec.handlerResBody).toEqual({
                     status: 'ok',
                 })
             });
 
             it(`should return 404 if we don't provide the basePath`, async () => {
-                await spec.injectLambda();
-                expect(spec.handlerRes.statusCode).toBe(404);
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerRes.statusCode).toBe(404);
+                expect(wrapperSpec.handlerResBody).toEqual({
                     statusCode: 404,
                     error: 'Not Found',
                     message: 'Not Found',
@@ -422,17 +345,17 @@ describe('.handlerFromServer()', () => {
 
         describe('setRequestId function', () => {
             beforeEach(() => {
-                spec.mockRoute.handler = (request) => {
+                wrapperSpec.mockRoute.handler = (request) => {
                     return { id: request.info.id };
                 };
-                spec.server.route(spec.mockRoute);
+                wrapperSpec.server.route(wrapperSpec.mockRoute);
             });
 
             const testSetRequestId = (): void => {
                 it('should set request.id', async () => {
-                    await spec.injectLambda();
-                    expect(spec.handlerRes.statusCode).toBe(200);
-                    expect(spec.handlerResBody).toEqual({
+                    await injectLambda();
+                    expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                    expect(wrapperSpec.handlerResBody).toEqual({
                         id: 'mock-aws-request-id',
                     });
                 });
@@ -444,7 +367,7 @@ describe('.handlerFromServer()', () => {
 
             describe('when setRequestId=tre', () => {
                 beforeEach(() => {
-                    spec.injectOptions.setRequestId = true;
+                    wrapperSpec.injectOptions.setRequestId = true;
                 });
 
                 testSetRequestId();
@@ -452,14 +375,14 @@ describe('.handlerFromServer()', () => {
 
             describe('when setRequestId=false', () => {
                 beforeEach(() => {
-                    spec.injectOptions.setRequestId = false;
+                    wrapperSpec.injectOptions.setRequestId = false;
                 })
 
                 it('should set NOT set request.id', async () => {
-                    await spec.injectLambda();
-                    expect(spec.handlerRes.statusCode).toBe(200);
-                    expect(spec.handlerResBody).toEqual({
-                        id: jasmine.stringMatching(new RegExp(spec.server.info.host)),
+                    await injectLambda();
+                    expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                    expect(wrapperSpec.handlerResBody).toEqual({
+                        id: jasmine.stringMatching(new RegExp(wrapperSpec.server.info.host)),
                     });
                 });
             });
@@ -467,14 +390,14 @@ describe('.handlerFromServer()', () => {
 
         describe('modifyRequest function', () => {
             it('should call it before injecting the request', async () => {
-                spec.mockRoute.handler = (request) => {
+                wrapperSpec.mockRoute.handler = (request) => {
                     return { credentials: request.auth.credentials };
                 };
-                spec.server.route(spec.mockRoute);
+                wrapperSpec.server.route(wrapperSpec.mockRoute);
 
-                spec.injectOptions.modifyRequest = (event, context, request) => {
-                    expect(event).toBe(spec.event);
-                    expect(context).toBe(spec.context);
+                wrapperSpec.injectOptions.modifyRequest = (event, context, request) => {
+                    expect(event).toBe(wrapperSpec.event);
+                    expect(context).toBe(wrapperSpec.context);
                     expect(request).toEqual({
                         method: 'GET',
                         url: '/health',
@@ -498,9 +421,9 @@ describe('.handlerFromServer()', () => {
                     }
                 };
 
-                await spec.injectLambda();
-                expect(spec.handlerRes.statusCode).toBe(200);
-                expect(spec.handlerResBody).toEqual({
+                await injectLambda();
+                expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+                expect(wrapperSpec.handlerResBody).toEqual({
                     credentials: {
                         user: 'mock-user',
                     },
@@ -511,7 +434,7 @@ describe('.handlerFromServer()', () => {
         it('should warn of compression is not disabled on the server', async () => {
             const warnSpy = spyOn(console, 'warn');
 
-            spec.server = new Server({
+            wrapperSpec.server = new Server({
                 compression: {
                     // use minBytes so we can see that it sets the vary header to accept-encoding
                     // which is not needed here since we never return gzipped responses
@@ -519,15 +442,15 @@ describe('.handlerFromServer()', () => {
                     minBytes: 1,
                 },
             });
-            spec.server.route(spec.mockRoute);
-            spec.serverToWrap = spec.server;
+            wrapperSpec.server.route(wrapperSpec.mockRoute);
+            wrapperSpec.serverToWrap = wrapperSpec.server;
 
-            spec.event.headers = null;
+            wrapperSpec.event.headers = null;
 
-            await spec.injectLambda();
-            expect(spec.handlerRes.statusCode).toBe(200);
-            expect(spec.handlerRes.headers).toBeUndefined();
-            expect(spec.handlerRes.multiValueHeaders).toEqual({
+            await injectLambda();
+            expect(wrapperSpec.handlerRes.statusCode).toBe(200);
+            expect(wrapperSpec.handlerRes.headers).toBeUndefined();
+            expect(wrapperSpec.handlerRes.multiValueHeaders).toEqual({
                 'content-type': [
                     'application/json; charset=utf-8',
                 ],
