@@ -21,6 +21,12 @@ export interface IInjectOptions {
      * A sync callback for modifying the request before injecting it to Hapi
      */
     modifyRequest?: IModifyRequestCb
+
+    /**
+     * Set the request ID of hapi requests to be the lambda reqest ID
+     * @default true
+     */
+    setRequestId?: boolean
 }
 
 export interface IRequestWithTailPromises extends Request {

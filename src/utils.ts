@@ -1,11 +1,9 @@
 import { ServerInjectOptions, ServerInjectResponse } from '@hapi/hapi';
 import { Headers } from '@hapi/shot';
-import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
 import * as Querystring from 'querystring';
-
-export function isPromise<T>(val: any): val is Promise<T> {
-    return typeof val.then === 'function'
-}
+import { ILambdaRequestPluginData } from './lambdaRequestIdPlugin/types';
+import { IInjectOptions } from './types';
 
 /**
  * Determine the real user IP from a request
@@ -19,7 +17,10 @@ export const realUserIp = (headers: Headers): string => {
     return null;
 };
 
-export function eventToHapiRequest(event: APIGatewayEvent, basePath: string): ServerInjectOptions {
+export function eventToHapiRequest(event: APIGatewayEvent, context: Context, {
+    basePath,
+    setRequestId,
+}: IInjectOptions): ServerInjectOptions {
     let url = event.path;
 
     // when accessing the route using a custom domain, we need to ignore the base path,
@@ -43,6 +44,14 @@ export function eventToHapiRequest(event: APIGatewayEvent, basePath: string): Se
 
     const remoteAddress = realUserIp(requestOptions.headers);
     if (remoteAddress) requestOptions.remoteAddress = remoteAddress;
+
+    if (setRequestId) {
+        (requestOptions.plugins as ILambdaRequestPluginData) = {
+            lambdaRequestId: {
+                requestId: context.awsRequestId,
+            },
+        };
+    }
 
     const qs = Querystring.stringify(event.multiValueQueryStringParameters);
     if (qs) {

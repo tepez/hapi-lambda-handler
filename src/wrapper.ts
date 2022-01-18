@@ -2,8 +2,9 @@ import { Server } from '@hapi/hapi'
 import { assignSame } from '@tepez/ts-utils'
 import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda'
 import * as Debug from 'debug'
+import { lambdaRequestIdPlugin } from './lambdaRequestIdPlugin/plugin';
 import { AsyncHandler, IInjectOptions, IRequestWithTailPromises } from './types'
-import { eventToHapiRequest, hapiResponseToResult, isPromise } from './utils';
+import { eventToHapiRequest, hapiResponseToResult } from './utils';
 
 
 // We use the debug module to determine if we need to print the message, i.e. we check if debug.enable
@@ -25,7 +26,7 @@ async function injectRequest(
         console.log(JSON.stringify(context, null, 2));
     }
 
-    const requestOptions = eventToHapiRequest(event, options.basePath);
+    const requestOptions = eventToHapiRequest(event, context, options);
 
     if (options.modifyRequest) {
         options.modifyRequest(event, context, requestOptions);
@@ -58,7 +59,9 @@ async function injectRequest(
  */
 export function handlerFromServer(server: Promise<Server> | Server, options?: IInjectOptions): AsyncHandler {
     let _server: Server;
-    const _options = assignSame<IInjectOptions>({}, options)
+    const _options = assignSame<IInjectOptions>({
+        setRequestId: true,
+    }, options)
 
     let serverChecked: boolean;
 
@@ -70,22 +73,18 @@ export function handlerFromServer(server: Promise<Server> | Server, options?: II
         serverChecked = true;
     };
 
-
-    if (isPromise(server)) {
-        server = server.then((resolvedServer) => {
-            _server = resolvedServer;
-            checkServerConfig(_server);
-            return _server;
-        })
-    } else {
-        _server = server;
+    const serverPromise = Promise.resolve(server).then(async (resolvedServer) => {
+        _server = resolvedServer;
+        if (_options.setRequestId) {
+            await _server.register(lambdaRequestIdPlugin);
+        }
         checkServerConfig(_server);
-    }
+    })
 
     return async function (event, context) {
         if (!_server) {
             try {
-                await server;
+                await serverPromise;
             } catch (_ignore) {
                 // ignoring the error, it's the responsibility of the parent app to capture init errors
                 return {

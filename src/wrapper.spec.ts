@@ -420,6 +420,51 @@ describe('.handlerFromServer()', () => {
             });
         });
 
+        describe('setRequestId function', () => {
+            beforeEach(() => {
+                spec.mockRoute.handler = (request) => {
+                    return { id: request.info.id };
+                };
+                spec.server.route(spec.mockRoute);
+            });
+
+            const testSetRequestId = (): void => {
+                it('should set request.id', async () => {
+                    await spec.injectLambda();
+                    expect(spec.handlerRes.statusCode).toBe(200);
+                    expect(spec.handlerResBody).toEqual({
+                        id: 'mock-aws-request-id',
+                    });
+                });
+            };
+
+            describe('by default', () => {
+                testSetRequestId();
+            });
+
+            describe('when setRequestId=tre', () => {
+                beforeEach(() => {
+                    spec.injectOptions.setRequestId = true;
+                });
+
+                testSetRequestId();
+            });
+
+            describe('when setRequestId=false', () => {
+                beforeEach(() => {
+                    spec.injectOptions.setRequestId = false;
+                })
+
+                it('should set NOT set request.id', async () => {
+                    await spec.injectLambda();
+                    expect(spec.handlerRes.statusCode).toBe(200);
+                    expect(spec.handlerResBody).toEqual({
+                        id: jasmine.stringMatching(new RegExp(spec.server.info.host)),
+                    });
+                });
+            });
+        });
+
         describe('modifyRequest function', () => {
             it('should call it before injecting the request', async () => {
                 spec.mockRoute.handler = (request) => {
@@ -437,6 +482,11 @@ describe('.handlerFromServer()', () => {
                             'mock-header': 'mock-value',
                             'user-agent': 'mock-user-agent',
                             host: 'mock-host',
+                        },
+                        plugins: {
+                            lambdaRequestId: {
+                                requestId: 'mock-aws-request-id',
+                            },
                         },
                     });
 
